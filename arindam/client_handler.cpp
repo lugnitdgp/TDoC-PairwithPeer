@@ -45,7 +45,7 @@ void searchfile(int sock_fd){
     struct dirent *d;
     struct stat dst;
     DIR *dir;
-    string path = "/shared/public"; 
+    string path = "./shared/public/"; 
     dir=opendir(path.c_str());
     bool res =false;
     if(dir!=NULL){
@@ -56,7 +56,7 @@ void searchfile(int sock_fd){
             if(S_ISDIR(dst.st_mode)){
                 continue;
             }
-            if(strcmp(d->d_name,filename)){
+            if(strcmp(d->d_name,filename)==0){
                 res = true;
                 break;
             }
@@ -115,7 +115,7 @@ void sharepublic(int sock_fd){
 
     //open and send to the file
     fstream fin;
-    string pathoffile="./shared/public"+(string)filename; //./shared/public/test
+    string pathoffile="./shared/public/"+(string)filename; //./shared/public/test
     fin.open(pathoffile,ios::in|ios::out);
 
     //calculate the size of file
