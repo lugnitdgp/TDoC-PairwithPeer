@@ -56,7 +56,7 @@ void search_file(int Sock_fd)
     struct dirent *d;//contains two values dinfo and dname
     struct stat dst;
     DIR *dir;
-    string path = "./shared/public/"; 
+    string path = "./shared/public"; 
     dir = opendir(path.c_str());
     bool res = false;
 
@@ -89,7 +89,7 @@ void send_file_list(int Sock_fd)
     struct stat dst;
     DIR *dir;
 
-    string path  = "./shared/public/";
+    string path  = "./shared/public";
     dir = opendir(path.c_str());
 
     bool res = false;
@@ -131,7 +131,7 @@ void sharepublic(int sock_fd)
 
     //open and send the file
     fstream fin;
-    string pathtofile = "./shared/public/"+(string)filename;
+    string pathtofile = "./shared/public"+(string)filename;
     fin.open(pathtofile,ios::in|ios::out);
 
     //calculate the size of the file
@@ -210,7 +210,7 @@ void try_download(string filename)
 {
     //create socket
     int sock_fd;
-    if((sock_fd=socket(AF_INET,SOCK_STREAM,0))<0)
+    if(sock_fd=socket(AF_INET,SOCK_STREAM,0)<0)
     {
         cout<<"Error in socket creation"<<endl;
         exit(1);
@@ -268,7 +268,7 @@ void try_download(string filename)
     Senderaddr.sin_port = htons(senderport);
 
     //we've closed that socket so we can use it again 
-    if((sock_fd=socket(AF_INET,SOCK_STREAM,0))<0)
+    if(sock_fd=socket(AF_INET,SOCK_STREAM,0)<0)
     {
         cout<<"Client req socket cannot be created"<<endl;
     }
@@ -298,64 +298,68 @@ void try_download(string filename)
     close(sock_fd);
 
 }   
-void getfilelist(){
+void getfilelist()
+{
     //connect to the server
     int sock_fd;
-    if((sock_fd=socket(AF_INET,SOCK_STREAM,0))<0){
-        cout<<"Error in socket creation"<<endl;
+    if(sock_fd=socket(AF_INET,SOCK_STREAM,0)<0)
+    {
+        cout<<"Error in connecting to server";
         return;
     }
-    if((connect(sock_fd, (struct sockaddr*)&Server_Address, sizeof(Server_Address)))<0){
-        cout<<"Cannot connect to server "<<endl;
-        close(sock_fd);
+    if(connect(sock_fd,(struct sockaddr*)&Server_Address,sizeof(Server_Address)<0))
+    {
+        cout<<"Cannot connect to the server"<<endl;
         return;
     }
-    //sending the requestid
-    cout<<"Sending request...."<<endl;
 
-    int req=3;
-    send(sock_fd,&req, sizeof(req),0);
+    //Send the requestID
+    cout<<"Sending request..."<<endl;
+    int req = 3;
+    send(sock_fd,&req,sizeof(req),0);
 
-    //sending the username
-    int datasize=ClientUsername.length();
-    send(sock_fd, ClientUsername.c_str(),datasize,0);
+    //Send the username
+    int datasize = ClientUsername.length();
+    send(sock_fd,&datasize,sizeof(datasize),0);
+    send(sock_fd,ClientUsername.c_str(),datasize,0);
 
-    cout<<"Fetching File List..."<<endl;
-    bool next_user=false, next_file=false;
+    cout<<"Fetching file list"<<endl;
+    bool next_user = false ,next_file = false;
+
     recv(sock_fd,&next_user,sizeof(next_user),0);
-    cout<<next_user<<endl;
+
     if(next_user==false)
     {
-        cout<<"No File found"<<endl;
+        cout<<"No file found"<<endl;
         close(sock_fd);
         return;
     }
+    cout<<"Files available in the network"<<endl<<endl;
 
-    cout<<"Files available in the nextwork: "<<endl;
-    char filename[100],clientname[100];
+    char clientName[100],filename[100];
     while(next_user==true)
     {
-        //recieving the username of client
-
-        memset(clientname,0,sizeof(clientname));
+        //receiving the username of client
+        memset(clientName,0,sizeof(clientName));
         recv(sock_fd,&datasize,sizeof(datasize),0);
-        recv(sock_fd,clientname,datasize,0);
+        recv(sock_fd,clientName,datasize,0);
 
-        cout<<"ClientName: "<<clientname<<endl;
+        cout<<"Client Name: "<<clientName<<endl;
         for(recv(sock_fd,&next_file,sizeof(next_file),0);next_file==true;recv(sock_fd,&next_file,sizeof(next_file),0))
         {
-            recv(sock_fd,&datasize, sizeof(datasize),0);
-            recv(sock_fd, filename,sizeof(filename),0);
+            
+            recv(sock_fd,&datasize,sizeof(datasize),0);
+            recv(sock_fd,filename,sizeof(filename),0);
 
-            filename[datasize]='\0';
-            cout<<"-"<<filename<<endl;
+            filename[datasize] ='\0';
+            cout<<" "<<filename<<endl;
         }
-
-        cout<<endl;
+        cout<<"\n";
         send(sock_fd,&next_user,sizeof(next_user),0);
+        
     }
+    //close socket
     close(sock_fd);
-
 }
 void user_interface()
 {
@@ -409,7 +413,7 @@ void handle_request(int tmp_sockfd,int requestid)
             cout<<"Invalid request monseiur"<<endl;
             break;
     }
-    close(tmp_sockfd);
+
 }
 void RunClient()
 {
@@ -471,7 +475,7 @@ void RunClient()
         exit(1);
     }
 
-    cout<<"Connected Successfully...."<<endl;
+    cout<<"Connected Successfully....\n";
 
     //send register request
     int requestid = 1;
@@ -487,12 +491,10 @@ void RunClient()
 
 
     datasize = myip.length();
-
-    //sending the ip address
     send(Client_Request_Sockfd,&datasize,sizeof(datasize),0);
     send(Client_Request_Sockfd,myip.c_str(),datasize,0);
 
-    //sending port number
+
     send(Client_Request_Sockfd,&myport,sizeof(myport),0);
 
     bool res;

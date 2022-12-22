@@ -39,56 +39,61 @@ string getip()
     pclose(f);
     return s;
 }
-void Register_Client(int Sockfd)
-{
-    char Client_Name[100] , Client_ipaddress[100],Client_port;
+void Register_Client(int Sock_fd){
+    char Client_Name[100], Client_ipaddress[100];
+    int Client_port;
     memset(Client_Name,0,100);
     memset(Client_ipaddress,0,100);
-    int datasize = 0;
+    int datasize=0;
 
-    //Client's username
-    recv(Sockfd,&datasize,sizeof(datasize),0);
-    recv(Sockfd,&Client_Name,sizeof(Client_Name),0);
+    //client's username
+    recv(Sock_fd, &datasize, sizeof(datasize),0);
+    recv(Sock_fd, &Client_Name, sizeof(Client_Name),0);
 
-    //Client's IPaddress
-    recv(Sockfd,&datasize,sizeof(datasize),0);
-    recv(Sockfd,&Client_ipaddress,sizeof(datasize),0);
 
-    //Client's Port Number
-    recv(Sockfd,&Client_port,sizeof(datasize),0);
+    //client's ipadress
+    recv(Sock_fd, &datasize, sizeof(datasize),0);
+    recv(Sock_fd, &Client_ipaddress, sizeof(Client_ipaddress),0);
 
-    //Register Client
-    //Critical Section we need to use Mutex
+    //client's port number
+    recv(Sock_fd, &Client_port, sizeof(Client_port),0);
+
+    //register client
+    //critical section we need to use mutex
     mtx.lock();
-    string username = Client_Name;
-    pair<string,int>clientinfo = {Client_ipaddress,Client_port};
-    auto it = Client_List.find(username);
 
+    string username = Client_Name;
+    pair<string, int>clientinfo;
+    clientinfo = {(string)Client_ipaddress,Client_port};
+    
+    std::map<string, pair<string, int> >::iterator it;
+    it=Client_List.find(username);
     if(it!=Client_List.end())
     {
-        bool res = 0;
-        send(Sockfd,&res,sizeof(res),0);
+        bool res = false;
+        send(Sock_fd, &res, sizeof(res),0);
         mtx.unlock();
-        return;
     }
 
-    Client_List[username] = clientinfo;
+    Client_List[username]=clientinfo;
     bool res = true;
-    send(Sockfd,&res,sizeof(res),0);
-    //Display the number of clients currently connected to the server
+    send(Sock_fd,&res, sizeof(res),0);
+
+    //display client's list
     for(auto it:Client_List)
     {
-        cout<<it.first<<" "<<it.second.first<<" "<<it.second.second<<endl;
+        cout<<it.first<<" ipaddr: "<<it.second.first<<" port no: "<<it.second.second<<endl;
     }
     mtx.unlock();
-
 }
+
 /* returns true if the file is found else returns false
 -fetches the filename which the client has requested and will send this
 to other users and check if it is present or not on other clients.If the match
 is found we will ask for  port number  and ipaddress of the client and send it to 
 the requesting client.
 */
+
 bool Handle_Download_Request(int Sockfd)
 {
     int tempfd,datasize=0;
@@ -119,7 +124,7 @@ bool Handle_Download_Request(int Sockfd)
         Client_Address.sin_port = htons(it->second.second);
 
         //creating temporary socket
-        if(tempfd=socket(AF_INET,SOCK_STREAM,0)<0)
+        if((tempfd=socket(AF_INET,SOCK_STREAM,0))<0)
         {
             cout<<"Wasn't able to create the temporary socket"<<endl;
             continue;
@@ -170,74 +175,73 @@ bool Handle_Download_Request(int Sockfd)
     }
     return false;
 }
-void Handle_List_Request(int Sockfd)
-{
-    int tempfd,datasize=0;
-    bool next_user = false,next_file;
+void Handle_List_Request(int Sock_fd){
+    int temp_fd, datasize=0;
     char username[100],filename[100];
-    struct sockaddr_in Client_Address;
+    bool next_user,next_file;
+    
+    struct sockaddr_in Client_addr;
+    memset(&username,0,sizeof(username));
+    
+    //get the username of the requesting client
+    recv(Sock_fd,&datasize,sizeof(datasize),0);
+    recv(Sock_fd,&username,sizeof(username),0);
 
-    memset(username,0,sizeof(username));
-
-    //get username
-    recv(Sockfd,&datasize,sizeof(datasize),0);
-    recv(Sockfd,&username,sizeof(username),0);
-
-    for(auto it = Client_List.begin();it!=Client_List.end();it++,next_user=false)
+    std::map<string,pair<string, int> >::iterator it;
+    
+    for(it=Client_List.begin(); it!=Client_List.end(); it++,next_user=false)
     {
-        if(it->first==username)//omit the filenames for the asking user
+        if(it->first==(string)username)
         {
             continue;
         }
-        
 
-        //creating a temporary socket
-        if(tempfd=socket(AF_INET,SOCK_STREAM,0)<0)
+        if((temp_fd=socket(AF_INET,SOCK_STREAM,0))<0)
         {
-            next_user = false;
-            send(Sockfd,&next_user,sizeof(next_user),0);
-            cout<<"Paradise Lost"<<endl;
-            return;
-        }  
-        memset(&Client_Address,0,sizeof(Client_Address));
-
-        Client_Address.sin_family = AF_INET;
-        Client_Address.sin_addr.s_addr=inet_addr(it->second.first.c_str());
-        Client_Address.sin_port= htons(it->second.second);
-
-        if(connect(tempfd,(struct sockaddr*)&Client_Address,sizeof(Client_Address))<0)
-        {
-            next_user =false;
-            send(Sockfd,&next_user,sizeof(next_user),0);
-            cout<<"No connection"<<endl;
+            next_user=false;
+            send(Sock_fd,&next_user,sizeof(next_user),0);
+            cout<<"Unexpected error occurred!"<<endl;
             return;
         }
-        next_user = true;
-        send(Sockfd,&next_user,sizeof(next_user),0);
 
-
-        datasize = it->first.size();
-        send(Sockfd,&datasize,sizeof(datasize),0);
-        send(Sockfd,(it->first.c_str()),datasize,0);
-
-        int req = 3;
-        send(tempfd,&req,sizeof(req),0);
-        datasize = 100;
+        memset(&Client_addr,0,sizeof(Client_addr));
         
-        for(recv(tempfd,&next_file,sizeof(next_file),0);next_file==true;recv(tempfd,&next_file,sizeof(next_file),0))
+        Client_addr.sin_family=AF_INET;
+        Client_addr.sin_addr.s_addr=inet_addr(it->second.first.c_str());
+        Client_addr.sin_port=htons(it->second.second);
+
+        if(connect(temp_fd, (struct sockaddr*)&Client_addr,sizeof(Client_addr))<0)
+        {
+            next_user=false;
+            send(Sock_fd,&next_user,sizeof(next_user),0);
+            cout<<"unexpected error occurred!"<<endl;
+            return;
+        }
+        next_user=true;
+        send(Sock_fd,&next_user,sizeof(next_user),0);
+
+        datasize=it->first.size();
+        send(Sock_fd,&datasize,sizeof(datasize),0);
+        send(Sock_fd,it->first.c_str(),datasize,0);
+
+        int req=3;
+        send(temp_fd,&req,sizeof(req),0);
+        datasize=100;
+        for(recv(temp_fd,&next_file,sizeof(next_file),0); next_file==true;recv(temp_fd, &next_file,sizeof(next_file),0))
         {
             memset(filename,0,datasize);
-            recv(tempfd,&datasize,sizeof(datasize),0);
-            recv(tempfd,&filename,sizeof(filename),0);
 
-            send(Sockfd,&next_file,sizeof(next_file),0);
-            send(Sockfd,&next_file,sizeof(datasize),0);
-            send(Sockfd,&filename,datasize,0);
-            
+            //recieve the filename
+            recv(temp_fd, &datasize,sizeof(datasize),0);
+            recv(temp_fd,&filename,sizeof(filename),0);
+
+            send(Sock_fd,&next_file,sizeof(next_file),0);
+            send(Sock_fd,&datasize, sizeof(datasize),0);
+            send(Sock_fd,&filename,datasize,0);
         }
-        close(tempfd);
+        close(temp_fd);
     }
-
+    
 }
 void Handle_Client_Request(int Sockfd,int RequestID)
 {
@@ -258,7 +262,7 @@ void Handle_Client_Request(int Sockfd,int RequestID)
             Handle_List_Request(Sockfd);
             break;
         default:
-            cout<<"Invalid Request";
+            cout<<"Invalid Request"<<endl;
             break;
         //close Socket
         close(Sockfd);
@@ -309,7 +313,7 @@ void RunServer()
 
     while(true)
     {
-        if(New_Client_Sockfd=accept(Server_Sockfd,(struct sockaddr*)&Server_address,&addr_size)<0)
+        if((New_Client_Sockfd=accept(Server_Sockfd,(struct sockaddr*)&Server_address,&addr_size))<0)
         {
             cout<<"Connection could not be established"<<endl;
             exit(1);
@@ -317,12 +321,10 @@ void RunServer()
         int RequestID;
         recv(New_Client_Sockfd,&RequestID,sizeof(RequestID),0);
 
-        //cout<<RequestID<<endl;
+        cout<<RequestID<<endl;
 
         std::thread thr(Handle_Client_Request,New_Client_Sockfd,RequestID);
         thr.detach();
     }
-
-    
 
 }
