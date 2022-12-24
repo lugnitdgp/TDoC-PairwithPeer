@@ -1,19 +1,18 @@
-#include<iostream>
+#include<sys/types.h>
+#include<sys/socket.h>
 #include<netinet/in.h>
 #include<arpa/inet.h>
 #include<sys/stat.h>
 #include<dirent.h>
 #include<fstream>
-#include<sys/socket.h>
-#include<sys/types.h>
-#include<cstring>
-#include<mutex>
-#include <thread>
-#include<string>
-#include<cstdlib>
-#include<fstream>
-#include<dirent.h>
+#include<netdb.h>
 #include<unistd.h>
+#include<thread>
+#include<cstdlib>
+#include<time.h>
+#include<string.h>
+#include<cstring>
+#include<iostream>
 
 #define PORT 8080 ///the listening port no of server
 #define PACKETSIZE 8 //packet size of the data being received
@@ -39,6 +38,7 @@ string getip()
         s+=c;
     }
     pclose(f);
+    cout<<s<<endl;
     return s;
 }
 //this function is called when server asks for the filename if it is present
@@ -62,6 +62,7 @@ void search_file(int Sock_fd)
 
     if(dir!=NULL)
     {
+        send(Sock_fd,&res,sizeof(res),0);
         for(d = readdir(dir);d!=NULL;d=readdir(dir))
         {
             stat((path+(string)d->d_name).c_str(),&dst);
@@ -162,6 +163,7 @@ void sharepublic(int sock_fd)
     packetCnt = filesize%PACKETSIZE; //remaining filesize 
     fin.seekg((i*PACKETSIZE),ios::beg);
     fin.read(tmp,packetCnt);
+    send(sock_fd,tmp,packetCnt,0);
 
     //close the file
     fin.close();
@@ -188,7 +190,7 @@ void download(int sock_fd,string &filename)
     {
         recv(sock_fd,tmp,PACKETSIZE,0);
         fout.write(tmp,PACKETSIZE); //no need to move the pointer it will automatically happen
-        memset(tmp,'\n',sizeof(tmp));
+        memset(tmp,'\0',sizeof(tmp));
 
     }
     packetCnt = filesize%PACKETSIZE;
@@ -199,7 +201,7 @@ void download(int sock_fd,string &filename)
     fout.close();
 
     cout<<"Download completed..."<<endl;
-    cout<<"Filename : "<<filename<<" "<<filesize<<endl;
+    cout<<"Filename : "<<filename<<" "<<filesize<<" bytes"<<endl;
 
 }
 //function: if a successful match for file is found , then we will 
@@ -253,8 +255,9 @@ void try_download(string filename)
 
     //receive Sender's ip and port no
     char senderip[100],senderport;
-    recv(sock_fd,&datasize,sizeof(datasize),0);
+    
     memset(senderip,0,sizeof(senderip));
+    recv(sock_fd,&datasize,sizeof(datasize),0);
     recv(sock_fd,&senderip,datasize,0);
     recv(sock_fd,&senderport,sizeof(senderport),0);
     close(sock_fd);
@@ -271,6 +274,7 @@ void try_download(string filename)
     if((sock_fd=socket(AF_INET,SOCK_STREAM,0))<0)
     {
         cout<<"Client req socket cannot be created"<<endl;
+        exit(1);
     }
 
     if(connect(sock_fd,(struct sockaddr*)&Senderaddr,sizeof(Senderaddr))<0)
@@ -305,7 +309,7 @@ void getfilelist(){
         cout<<"Error in socket creation"<<endl;
         return;
     }
-    if((connect(sock_fd, (struct sockaddr*)&Server_Address, sizeof(Server_Address)))<0){
+    if(connect(sock_fd, (struct sockaddr*)&Server_Address, sizeof(Server_Address))<0){
         cout<<"Cannot connect to server "<<endl;
         close(sock_fd);
         return;
@@ -323,6 +327,8 @@ void getfilelist(){
     cout<<"Fetching File List..."<<endl;
     bool next_user=false, next_file=false;
     recv(sock_fd,&next_user,sizeof(next_user),0);
+
+
     cout<<next_user<<endl;
     if(next_user==false)
     {
@@ -407,7 +413,6 @@ void handle_request(int tmp_sockfd,int requestid)
             break;
         default:
             cout<<"Invalid request monseiur"<<endl;
-            break;
     }
     close(tmp_sockfd);
 }
@@ -531,7 +536,7 @@ void RunClient()
     {
         if((tmp_sockfd=accept(Client_Listen_Sockfd,(struct sockaddr*)&tmpaddr,&addrsize))<0)
         {
-            cout<<"Connection request failed"<<endl;
+            cout<<"Accepting error"<<endl;
             exit(1);
         }
         //recieve the requestid

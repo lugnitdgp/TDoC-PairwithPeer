@@ -39,7 +39,8 @@ string getip()
     pclose(f);
     return s;
 }
-void Register_Client(int Sock_fd){
+void Register_Client(int Sock_fd)
+{
     char Client_Name[100], Client_ipaddress[100];
     int Client_port;
     memset(Client_Name,0,100);
@@ -114,8 +115,8 @@ bool Handle_Download_Request(int Sockfd)
     recv(Sockfd,&datasize,sizeof(datasize),0);
     recv(Sockfd,&username,datasize,0);
 
-    auto it = Client_List.find(username);
-    it++;
+    std::map<string,pair<string, int> >::iterator it;
+    it = Client_List.find(username);
 
     while(it->first!=username)
     {
@@ -133,7 +134,6 @@ bool Handle_Download_Request(int Sockfd)
         //connect
         if(connect(tempfd,(struct sockaddr*)&Client_Address,sizeof(Client_Address))<0)
         {
-            it++;
             continue;
         }
 
@@ -179,8 +179,8 @@ void Handle_List_Request(int Sock_fd){
     int temp_fd, datasize=0;
     char username[100],filename[100];
     bool next_user,next_file;
-    
     struct sockaddr_in Client_addr;
+
     memset(&username,0,sizeof(username));
     
     //get the username of the requesting client
@@ -205,10 +205,10 @@ void Handle_List_Request(int Sock_fd){
         }
 
         memset(&Client_addr,0,sizeof(Client_addr));
-        
         Client_addr.sin_family=AF_INET;
         Client_addr.sin_addr.s_addr=inet_addr(it->second.first.c_str());
         Client_addr.sin_port=htons(it->second.second);
+
 
         if(connect(temp_fd, (struct sockaddr*)&Client_addr,sizeof(Client_addr))<0)
         {
@@ -263,7 +263,6 @@ void Handle_Client_Request(int Sockfd,int RequestID)
             break;
         default:
             cout<<"Invalid Request"<<endl;
-            break;
         //close Socket
         close(Sockfd);
         return;
@@ -277,7 +276,7 @@ void RunServer()
     socklen_t addr_size;
     addr_size = sizeof(Server_address);
 
-    memset(&Server_address,0,addr_size);
+    memset(&Server_address,0,addr_size); //Clearing the server address
 
     //socket creation
     Server_Sockfd = socket(AF_INET,SOCK_STREAM,0);
@@ -322,7 +321,6 @@ void RunServer()
         recv(New_Client_Sockfd,&RequestID,sizeof(RequestID),0);
 
         cout<<RequestID<<endl;
-
         std::thread thr(Handle_Client_Request,New_Client_Sockfd,RequestID);
         thr.detach();
     }
